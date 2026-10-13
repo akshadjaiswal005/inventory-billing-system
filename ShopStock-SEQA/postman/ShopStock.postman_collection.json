@@ -1,0 +1,37 @@
+{
+  "info": {
+    "name": "Vistara Labs - ShopStock Inventory and Billing API",
+    "description": "Postman collection for the Inventory and Billing System SRS. Uses Flask session-cookie authentication; run Login first. Change baseUrl if the server runs elsewhere.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key":"baseUrl","value":"http://127.0.0.1:5000"},
+    {"key":"productId","value":"1"},
+    {"key":"billId","value":"1"}
+  ],
+  "item": [
+    {"name":"00 - Authentication", "item":[
+      {"name":"Admin login", "request":{"method":"POST","header":[{"key":"Content-Type","value":"application/x-www-form-urlencoded"}],"body":{"mode":"urlencoded","urlencoded":[{"key":"username","value":"admin"},{"key":"password","value":"Admin@123"}]},"url":{"raw":"{{baseUrl}}/login","host":["{{baseUrl}}"],"path":["login"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Login returns success redirect', function () { pm.expect(pm.response.code).to.be.oneOf([200, 302]); });"]}}]},
+      {"name":"Cashier login (run separately if needed)","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/x-www-form-urlencoded"}],"body":{"mode":"urlencoded","urlencoded":[{"key":"username","value":"cashier"},{"key":"password","value":"Cashier@123"}]},"url":{"raw":"{{baseUrl}}/login","host":["{{baseUrl}}"],"path":["login"]}}}
+    ]},
+    {"name":"01 - Product Management", "item":[
+      {"name":"GET all products", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/products","host":["{{baseUrl}}"],"path":["api","products"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Status is 200', () => pm.response.to.have.status(200));","pm.test('Body is a JSON array', () => pm.expect(pm.response.json()).to.be.an('array'));","pm.test('Response time below 2 seconds', () => pm.expect(pm.response.responseTime).to.be.below(2000));"]}}]},
+      {"name":"POST create product", "request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"sku\": \"POSTMAN-100\",\n  \"name\": \"Postman Test Product\",\n  \"price\": 25.5,\n  \"quantity\": 20,\n  \"tax_rate\": 5,\n  \"low_stock_threshold\": 3\n}"},"url":{"raw":"{{baseUrl}}/api/products","host":["{{baseUrl}}"],"path":["api","products"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Created with status 201', () => pm.response.to.have.status(201));","const body = pm.response.json();","pm.test('Created product has id and SKU', () => { pm.expect(body.id).to.exist; pm.expect(body.sku).to.eql('POSTMAN-100'); });","if (body.id) pm.collectionVariables.set('createdProductId', body.id);"]}}]},
+      {"name":"GET product by ID", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/products/{{productId}}","host":["{{baseUrl}}"],"path":["api","products", "{{productId}}"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Status is 200', () => pm.response.to.have.status(200));","pm.test('Product response has id', () => pm.expect(pm.response.json().id).to.exist);"]}}]},
+      {"name":"PUT update product (admin)", "request":{"method":"PUT","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"name\": \"Updated Product Name\",\n  \"price\": 29.99\n}"},"url":{"raw":"{{baseUrl}}/api/products/{{productId}}","host":["{{baseUrl}}"],"path":["api","products", "{{productId}}"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Update returns 200', () => pm.response.to.have.status(200));","pm.test('Name was updated', () => pm.expect(pm.response.json().name).to.eql('Updated Product Name'));"]}}]},
+      {"name":"DELETE created product (admin; create first)", "request":{"method":"DELETE","url":{"raw":"{{baseUrl}}/api/products/{{createdProductId}}","host":["{{baseUrl}}"],"path":["api","products","{{createdProductId}}"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Delete returns 204', () => pm.response.to.have.status(204));"]}}]},
+      {"name":"POST invalid product", "request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"sku\": \"\",\n  \"name\": \"\",\n  \"price\": -1,\n  \"quantity\": -3\n}"},"url":{"raw":"{{baseUrl}}/api/products","host":["{{baseUrl}}"],"path":["api","products"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Invalid input is rejected', () => pm.response.to.have.status(400));"]}}]}
+    ]},
+    {"name":"02 - Inventory", "item":[
+      {"name":"GET low-stock products", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/inventory/low-stock","host":["{{baseUrl}}"],"path":["api","inventory","low-stock"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Status is 200', () => pm.response.to.have.status(200));","pm.test('Body is array', () => pm.expect(pm.response.json()).to.be.an('array'));","pm.test('Low-stock items are at or below threshold', () => pm.response.json().forEach(p => pm.expect(p.quantity).to.be.at.most(p.low_stock_threshold))); "]}}]}
+    ]},
+    {"name":"03 - Billing", "item":[
+      {"name":"POST create bill (adjust productId and quantity) ","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"items\": [\n    {\"product_id\": {{productId}}, \"quantity\": 1}\n  ]\n}"},"url":{"raw":"{{baseUrl}}/api/bills","host":["{{baseUrl}}"],"path":["api","bills"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Bill created', () => pm.response.to.have.status(201));","const b = pm.response.json();","pm.test('Bill includes totals and receipt number', () => { pm.expect(b.receipt_no).to.exist; pm.expect(b.total).to.be.a('number'); });","if (b.id) pm.collectionVariables.set('billId', b.id);"]}}]},
+      {"name":"GET bills", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/bills","host":["{{baseUrl}}"],"path":["api","bills"]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Status is 200', () => pm.response.to.have.status(200));","pm.test('Body is array', () => pm.expect(pm.response.json()).to.be.an('array')); "]}}]}
+    ]},
+    {"name":"04 - Sales Reports (admin only)", "item":[
+      {"name":"GET daily sales report", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/reports/sales?period=daily","host":["{{baseUrl}}"],"path":["api","reports","sales"],"query":[{"key":"period","value":"daily"}]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Status is 200', () => pm.response.to.have.status(200));","pm.test('Report has totals', () => { const r=pm.response.json(); pm.expect(r.period).to.eql('daily'); pm.expect(r.total).to.be.a('number'); });"]}}]},
+      {"name":"GET invalid report period", "request":{"method":"GET","url":{"raw":"{{baseUrl}}/api/reports/sales?period=yearly","host":["{{baseUrl}}"],"path":["api","reports","sales"],"query":[{"key":"period","value":"yearly"}]}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('Invalid period returns 400', () => pm.response.to.have.status(400));"]}}]}
+    ]}
+  ]
+}
